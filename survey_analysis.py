@@ -127,20 +127,35 @@ pre_df = pre_df[[ 'Time Management', 'Achievement Motivation', 'Intellectual Fle
 
 #scipy.stats.shapiro(post_df['Time Management'])
 
+def test_normality():
+    for column in ['Time Management' , 'Achievement Motivation', 
+                    'Intellectual Flexibility' ,'Emotional Control',
+                    'Self Confidence' ,'Social Competence']:
+         print 'post-program', column, sp.stats.shapiro(post_df[column])
+    
+    post_table = [["Time Management", 0.7989435195922852, 1.7665534833566365e-12],
+                ["Intellectual Flexibility", 0.8067236542701721, 3.310084845109529e-12],
+            ["Achievement Motivation" ,0.5009009838104248, 1.0594767746240141e-19],
+            ["Emotional Control", 0.8851432800292969, 6.317574907654944e-09],
+            ["Self Confidence", 0.609407901763916, 1.4120606676629398e-17],
+            ["Social Competence", 0.8981918692588806, 3.001261816848455e-08]]
+    post = tabulate(post_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')
+
 for column in ['Time Management' , 'Achievement Motivation', 
                 'Intellectual Flexibility' ,'Emotional Control',
                 'Self Confidence' ,'Social Competence']:
-     print 'post-program', column, sp.stats.shapiro(post_df[column])
+     print 'pre-program', column, sp.stats.shapiro(pre_df[column])
 
-post_table = [["Time Management", 0.7989435195922852, 1.7665534833566365e-12],
-              ["Intellectual Flexibility", 0.8067236542701721, 3.310084845109529e-12],
-         ["Achievement Motivation" ,0.5009009838104248, 1.0594767746240141e-19],
-         ["Emotional Control", 0.8851432800292969, 6.317574907654944e-09],
-         ["Self Confidence", 0.609407901763916, 1.4120606676629398e-17],
-        ["Social Competence", 0.8981918692588806, 3.001261816848455e-08]]
-post = tabulate(post_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')
-
-file1 = open("tables.txt",'w')
-file1.write('Post-Program - Shapiro Wilk test for normality\n')
-file1.write(post)
-file1.close()
+#pre_table = [["Time Management", 0.7989435195922852, 1.7665534833566365e-12],
+#              ["Intellectual Flexibility", 0.8067236542701721, 3.310084845109529e-12],
+#         ["Achievement Motivation" ,0.5009009838104248, 1.0594767746240141e-19],
+#         ["Emotional Control", 0.8851432800292969, 6.317574907654944e-09],
+#         ["Self Confidence", 0.609407901763916, 1.4120606676629398e-17],
+#        ["Social Competence", 0.8981918692588806, 3.001261816848455e-08]]
+#
+#post = tabulate(post_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')
+#
+#file1 = open("tables.txt",'w')
+#file1.write('Post-Program - Shapiro Wilk test for normality\n')
+#file1.write(post)
+#file1.close()
