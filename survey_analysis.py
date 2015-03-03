@@ -8,6 +8,8 @@ import statsmodels as sms
 from tabulate import tabulate 
 import re
 import patsy
+import xlrd
+import openpyxl
 
 df1 = pd.read_csv('/Users/kritikarai/Desktop/PrisonData/PrisonData_2015_1.csv')
 df1 = df1.drop('ID_Check',axis=1)
@@ -34,7 +36,7 @@ df = df[['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', '
        'PostQ8i', 'PostQ8j', 'PostQ9', 'PostQ10a', 'PostQ10b', 'PostQ10c','PostQ10d', 'PostQ10e', 'PostQ11a', 'PostQ11b', 'PostQ11c',
        'PostQ11d', 'PostQ12a', 'PostQ12b', 'PostQ12c', 'PostQ12d','PostQ12e', 'PostQ12f', 'PostQ12g', 'PostQ12h']]
        
-columns_to_keep = ['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', 'Samples', 'PreQ1', 'PostQ1','Q12', 'Q13', 'Q14', 'Q15', 'Q16', 'Q17',
+columns_to_keep = ['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', 'Samples', 'PreQ4','PreQ1', 'PostQ1','Q12', 'Q13', 'Q14', 'Q15', 'Q16', 'Q17',
        'Q18', 'Q19', 'Q20', 'Q21', 'Q22', 'Q23', 'Q24', 'Q25', 'Q26','Q27', 'Q28', 'PostQ30']
 attitudinal_scales_df = pd.DataFrame(df,columns = columns_to_keep)
 
@@ -243,24 +245,16 @@ file1.write(ranksums()[0] +'\n\n\n\n')
 file1.write('Wilcoxon Rank Sums Test - With Art Experience(Whole Sample)\n')
 file1.write(ranksums()[1] + '\n\n\n\n')
 
-
 def stats_artexp():
     pre_stats = pre_df.groupby('art_experience')
-    pre_table = []
-    for column in attributes:
-        pre_table.append([column, pre_stats[column].agg([np.count_nonzero, np.mean, np.std])])
+    grouped_pre = pre_stats[attributes].agg([np.count_nonzero, np.mean, np.std])
     post_stats = post_df.groupby('art_experience')
-    post_table = []
-    for column in attributes:
-        post_table.append([column, post_stats[column].agg([np.count_nonzero,np.mean, np.std])])
-
-    return (tabulate(pre_table, tablefmt = 'rst', floatfmt = '.4f', numalign = 'right'),
-            tabulate(post_table, tablefmt = 'rst', floatfmt = '.4f', numalign = 'right'))
-
-file1.write('Descriptive statistics - Without Art Experience(Whole Sample)\n')
-file1.write(stats_artexp()[0] +'\n\n\n\n')
-file1.write('Descriptive statistics - With Art Experience(Whole Sample)\n')
-file1.write(stats_artexp()[1] + '\n\n\n\n')
+    grouped_post = post_stats[attributes].agg([np.count_nonzero, np.mean, np.std])
+    
+    writer = pd.ExcelWriter("stats_artexp.xlsx")
+    grouped_pre.to_excel(writer, 'Sheet1')
+    grouped_post.to_excel(writer, 'Sheet2')
+    writer.save()
 
 def ttest_ind(Gender = 'all'):
     pre_noart = pre_df.loc[pre_df['art_experience'] == 'No']
@@ -323,15 +317,112 @@ def ttest_paired(Gender='Female'):
         t, p = sp.stats.ttest_rel(pre[column], post[column]) 
         print column, t, round(p,4)
 
+def chisq():
+    attitudinal_scales_df['Num'] = np.arange(323)
+    renamed_df = attitudinal_scales_df.rename(columns = {'PreQ4': 'Pursuing Education' , 'art_experience' : 'Previous Art Experience'})
+    pivot = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero, margins = True)
+    
+    pivot.to_csv("prison.csv") 
+    
+    #computing chi sq without totals columns
+    pivot_chisq = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero)
+    chisq = sp.stats.chi2_contingency(pivot_chisq)
+    stats = []
+    for i in chisq[:2]:
+        stats.append(round(i, 4))
+    chi2 = pd.DataFrame(stats, index = ['chi2', 'p-value'])
+    chi2.to_csv("prison.csv", mode = 'a')
 
-#
-#def pivot():
-#    
+# making a dictionary with labels
+labels = {}
 
-print attitudinal_scales_df.columns
+with open('varnames.txt') as f:
+    for line in f:
+        ls = line.split()
+        #print ls
+        labels[ls[0]] = ' '.join(ls[1:])
+labels['art_experience'] = 'Previous Art Experience'
 
 
+df['PreQ11c'] = df['PreQ11c'].replace('11','Yes')
 
+def pre_pivot():  
+    df['art_experience'] = df['PostQ1']
+    for index, values in df['PreQ1'].iteritems():
+        if values in ['Yes, both studied and practiced', 'Yes, practiced', 'Yes, studied' ]:
+            df.loc[index, 'art_experience'] = 'Yes'
+        elif values == "No, I haven't":
+            df.loc[index, 'art_experience'] ='No' 
+    
+    df['Observations'] = np.arange(323)
+    df_renamed = df.rename(columns = {'PreQ4': 'Pursued Education'})
+    
+    #PreQ3
+
+    dict = {'PreQ3' : ['PreQ3a','PreQ3b', 'PreQ3c', 'PreQ3d', 'PreQ3e', 'PreQ3f', 'PreQ3g'],
+            'PreQ5' : [ 'PreQ5a', 'PreQ5b', 'PreQ5c'],
+            'PreQ10' : ['PreQ10a', 'PreQ10b', 'PreQ10c', 'PreQ10d', 'PreQ10e'],
+            'PreQ11' : ['PreQ11a', 'PreQ11b', 'PreQ11c', 'PreQ11d', 'PreQ11e', 'PreQ11f', 'PreQ11g']}
+    
+    i = 0
+    writer = pd.ExcelWriter('freq.xlsx')
+    for k,v in dict.iteritems():
+        i += 1
+        ls = []
+        for column in v:           
+            pivot = pd.pivot_table(df_renamed, values = ['Observations'], columns = 'Pursued Education',
+                            index = column, aggfunc = len, dropna = True)   
+            ls.append(pivot)
+
+        con = pd.concat(ls, keys = v)
+        con = con.groupby(level=0).transform(lambda x: np.round(((x/x.sum())*100),2))
+
+        renamed = con.rename(index = labels)
+        renamed.to_excel(writer, sheet_name='Sheet' + str(i))
+        print 'Sheet', i
+    writer.save()
+
+def post_pivot():
+    df['art_experience'] = df['PostQ1']
+    for index, values in df['PreQ1'].iteritems():
+        if values in ['Yes, both studied and practiced', 'Yes, practiced', 'Yes, studied' ]:
+            df.loc[index, 'art_experience'] = 'Yes'
+        elif values == "No, I haven't":
+            df.loc[index, 'art_experience'] ='No' 
+    
+    df['Observations'] = np.arange(323)
+    df_renamed = df.rename(columns = {'PostQ4': 'Pursued Education'})
+    
+    #PreQ3
+
+    dict = {'PreQ3' : ['PreQ3a','PreQ3b', 'PreQ3c', 'PreQ3d', 'PreQ3e', 'PreQ3f', 'PreQ3g'],
+            'PreQ5' : [ 'PreQ5a', 'PreQ5b', 'PreQ5c'],
+            'PreQ10' : ['PreQ10a', 'PreQ10b', 'PreQ10c', 'PreQ10d', 'PreQ10e'],
+            'PreQ11' : ['PreQ11a', 'PreQ11b', 'PreQ11c', 'PreQ11d', 'PreQ11e', 'PreQ11f', 'PreQ11g']}
+    
+    i = 0
+    writer = pd.ExcelWriter('freq.xlsx')
+    for k,v in dict.iteritems():
+        i += 1
+        ls = []
+        for column in v:           
+            pivot = pd.pivot_table(df_renamed, values = ['Observations'], columns = 'Pursued Education',
+                            index = column, aggfunc = len, dropna = True)   
+            ls.append(pivot)
+
+        con = pd.concat(ls, keys = v)
+        con = con.groupby(level=0).transform(lambda x: np.round(((x/x.sum())*100),2))
+
+        renamed = con.rename(index = labels)
+        renamed.to_excel(writer, sheet_name='Sheet' + str(i))
+        print 'Sheet', i
+    writer.save()
+
+    
+    
+
+                
+                    
 
 
 #prison_count= df['Prison'].value_counts()
