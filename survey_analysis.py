@@ -153,18 +153,15 @@ file1.write(test_normality()[0] + '\n' + 'W stat is significant for all attribut
 def descriptive_stats():
     pre = pre_df[attributes].describe() 
     post = post_df[attributes].describe()
-    pre = tabulate(pre,headers = attributes,
-                    tablefmt = 'rst', floatfmt = '.2f')
-    post = tabulate(post, headers = attributes,
-                    tablefmt = 'rst', floatfmt = '.2f')
-    return (pre,post)
+    #pre = tabulate(pre,headers = attributes,
+    #                tablefmt = 'rst', floatfmt = '.2f')
+    #post = tabulate(post, headers = attributes,
+    #                tablefmt = 'rst', floatfmt = '.2f')
+    writer = pd.ExcelWriter("stats_base.xlsx")
+    pre.to_excel(writer, 'Sheet1')
+    post.to_excel(writer, 'Sheet2')
+    writer.save()
     
-file1.write('Descriptive Statistics (Pre-Program)\n')
-file1.write(descriptive_stats()[0] +'\n\n')
-file1.write('Descriptive Statistics (Post-Program)\n')
-file1.write(descriptive_stats()[1] + '\n\n\n\n')
-
-
 def mannwhitney(Samples = 'Independent'):
     pre_noart = pre_df.loc[pre_df['art_experience'] == 'No']
     pre_art = pre_df.loc[pre_df['art_experience'] == 'Yes']
@@ -180,13 +177,11 @@ def mannwhitney(Samples = 'Independent'):
     table_noart = []
     for column in attributes:
         u_noart, p_noart = sp.stats.mannwhitneyu(pre_noart[column],post_noart[column], use_continuity = False) 
-        #print pre_noart['art_experience'].value_counts(), column, (u_noart,round(p_noart,4)) 
         table_noart.append([column, u_noart, round(p_noart,4)])
         
     table_art = []
     for column in attributes:
         u_art, p_art = sp.stats.mannwhitneyu(pre_art[column],post_art[column], use_continuity = False) 
-        #print pre_art['art_experience'].value_counts(), column, (u_art,round(p_art,4)) 
         table_art.append([column, u_art, round(p_art,4)])
 
     return (tabulate(table_noart, headers = ['Attribute','U stat', 'p value'], tablefmt = 'rst', floatfmt = '.4f'),
@@ -211,7 +206,6 @@ def wilcoxon():
         #diff = np.subtract(post[column], pre[column])
         t,p = sp.stats.wilcoxon(pre[column], post[column])
         print column, t, round(p,4)
-        
 
 def ranksums(Samples = 'Independent'):
     '''Wilcoxon for independent samples, like mann whitney
@@ -285,8 +279,6 @@ file1.write('Independent Samples t-test - Without Art Experience(Whole Sample)\n
 file1.write(ttest_ind()[0] +'\n\n\n\n')
 file1.write('Independent Samples t-test - With Art Experience(Whole Sample)\n')
 file1.write(ttest_ind()[1] + '\n\n\n\n')
-file1.close()
-
 
 #altered for females(for pairing)
 
@@ -312,26 +304,37 @@ def ttest_paired(Gender='Female'):
         pre[attribute] = pre[questions].sum(axis=1,skipna=False)
         post[attribute] = post[questions].sum(axis=1,skipna=False)
         
-
+    table = []
     for column in attributes:
         t, p = sp.stats.ttest_rel(pre[column], post[column]) 
-        print column, t, round(p,4)
+        table.append([column, t, p])
+    return (tabulate(table, headers = ['Attribute','t stat', 'p value'], tablefmt = "pipe", floatfmt = '.4f'))
+
+file1.write('Paired Samples t-test - (Women Prison Data)\n')
+file1.write(ttest_ind()[0] +'\n\n\n\n')
+file1.close()
+   
+
 
 def chisq():
     attitudinal_scales_df['Num'] = np.arange(323)
     renamed_df = attitudinal_scales_df.rename(columns = {'PreQ4': 'Pursuing Education' , 'art_experience' : 'Previous Art Experience'})
-    pivot = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero, margins = True)
-    
-    pivot.to_csv("prison.csv") 
+    pivot = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero)
+    pivot = pivot.apply(lambda x: np.round(((x/x.sum())),4), axis=0)
+    writer = pd.ExcelWriter("chisq.xlsx")
+    pivot.to_excel(writer, 'Sheet1') 
     
     #computing chi sq without totals columns
-    pivot_chisq = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero)
+    pivot_chisq = pd.pivot_table(renamed_df, values = ['Num'], index = 'Previous Art Experience', columns = 'Pursuing Education', aggfunc = np.count_nonzero)    
     chisq = sp.stats.chi2_contingency(pivot_chisq)
     stats = []
     for i in chisq[:2]:
         stats.append(round(i, 4))
     chi2 = pd.DataFrame(stats, index = ['chi2', 'p-value'])
-    chi2.to_csv("prison.csv", mode = 'a')
+    chi2.to_excel(writer, 'Sheet2')
+    writer.save()
+
+chisq()
 
 # making a dictionary with labels
 labels = {}
@@ -357,8 +360,6 @@ def pre_pivot():
     df['Observations'] = np.arange(323)
     df_renamed = df.rename(columns = {'PreQ4': 'Pursued Education'})
     
-    #PreQ3
-
     dict = {'PreQ3' : ['PreQ3a','PreQ3b', 'PreQ3c', 'PreQ3d', 'PreQ3e', 'PreQ3f', 'PreQ3g'],
             'PreQ5' : [ 'PreQ5a', 'PreQ5b', 'PreQ5c'],
             'PreQ10' : ['PreQ10a', 'PreQ10b', 'PreQ10c', 'PreQ10d', 'PreQ10e'],
@@ -375,67 +376,21 @@ def pre_pivot():
             ls.append(pivot)
 
         con = pd.concat(ls, keys = v)
-        con = con.groupby(level=0).transform(lambda x: np.round(((x/x.sum())*100),2))
+        con = con.groupby(level=0).transform(lambda x: np.round(((x/x.sum())),4))
 
         renamed = con.rename(index = labels)
         renamed.to_excel(writer, sheet_name='Sheet' + str(i))
-        print 'Sheet', i
     writer.save()
 
-def post_pivot():
-    df['art_experience'] = df['PostQ1']
-    for index, values in df['PreQ1'].iteritems():
-        if values in ['Yes, both studied and practiced', 'Yes, practiced', 'Yes, studied' ]:
-            df.loc[index, 'art_experience'] = 'Yes'
-        elif values == "No, I haven't":
-            df.loc[index, 'art_experience'] ='No' 
-    
-    df['Observations'] = np.arange(323)
-    df_renamed = df.rename(columns = {'PostQ4': 'Pursued Education'})
-    
-    #PreQ3
+pre_pivot()
+def barplots():                              
+    prison_count= df['Prison'].value_counts()
+    prison_count.plot(kind = 'bar',title = 'Count of Prisons', color = ['r','b','g'] ,fontsize = 12)
+    g = sns.factorplot('Prison', data=df , palette = 'Pastel1', legend= True,margin_titles = True)
+    print g
 
-    dict = {'PreQ3' : ['PreQ3a','PreQ3b', 'PreQ3c', 'PreQ3d', 'PreQ3e', 'PreQ3f', 'PreQ3g'],
-            'PreQ5' : [ 'PreQ5a', 'PreQ5b', 'PreQ5c'],
-            'PreQ10' : ['PreQ10a', 'PreQ10b', 'PreQ10c', 'PreQ10d', 'PreQ10e'],
-            'PreQ11' : ['PreQ11a', 'PreQ11b', 'PreQ11c', 'PreQ11d', 'PreQ11e', 'PreQ11f', 'PreQ11g']}
-    
-    i = 0
-    writer = pd.ExcelWriter('freq.xlsx')
-    for k,v in dict.iteritems():
-        i += 1
-        ls = []
-        for column in v:           
-            pivot = pd.pivot_table(df_renamed, values = ['Observations'], columns = 'Pursued Education',
-                            index = column, aggfunc = len, dropna = True)   
-            ls.append(pivot)
-
-        con = pd.concat(ls, keys = v)
-        con = con.groupby(level=0).transform(lambda x: np.round(((x/x.sum())*100),2))
-
-        renamed = con.rename(index = labels)
-        renamed.to_excel(writer, sheet_name='Sheet' + str(i))
-        print 'Sheet', i
-    writer.save()
-
-    
-    
-
-                
-                    
-
-
-#prison_count= df['Prison'].value_counts()
-#prison_count.plot(kind = 'bar',title = 'Count of Prisons', color = ['r','b','g'] ,fontsize = 12)
-#g = sns.factorplot('Prison', data=df , palette = 'Pastel1', legend= True,margin_titles = True)
-#g.set_titles('Count of Prisons') # doesn't work
-#     
-#print df2['PostQ1']
-#
-#pre_df['Time Management'] = pre_df['Time Management'].dropna()
-#print post_df.columns.values
-#print pre_df.columns.values
-#print pre_df
+def att_barplots():
+    pre_df[attributes].plot(kind = 'bar',title = 'Count of Prisons', color = ['r','b','g'] ,fontsize = 12)
 
 
 
