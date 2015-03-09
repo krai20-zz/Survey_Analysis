@@ -4,17 +4,13 @@ import seaborn as sns
 import scipy as sp
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-import statsmodels as sms
 from tabulate import tabulate 
 import re
-import patsy
-import xlrd
-import openpyxl
 
-df1 = pd.read_csv('/Users/kritikarai/Desktop/PrisonData/PrisonData_2015_1.csv')
+df1 = pd.read_csv('/Users/kritikarai/Desktop/PrisonData/Data/PrisonData_2015_1.csv')
 df1 = df1.drop('ID_Check',axis=1)
 df1 = df1.iloc[:144]
-df2 = pd.read_csv('/Users/kritikarai/Desktop/PrisonData/PrisonData_2014.csv')
+df2 = pd.read_csv('/Users/kritikarai/Desktop/PrisonData/Data/PrisonData_2014.csv')
 df = pd.concat([df1,df2] ,join = 'outer', ignore_index = True)
 
 new = open('/Users/kritikarai/Desktop/finaldata.csv','w')
@@ -22,7 +18,7 @@ df.to_csv(new)
 new.close()
 
 columns_drop = ['AM','EC','IF','S0','SC','TM','NewPreQ1','NewQ15','NewQ17','NewQ19','NewQ22','NewQ24','NewQ25','NewQ26','filter_$']
-df = df.drop(columns_drop,axis =1)
+df = df.drop(columns_drop,axis = 1)
 
 cols = df1.columns.values
 
@@ -36,41 +32,40 @@ df = df[['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', '
        'PostQ8i', 'PostQ8j', 'PostQ9', 'PostQ10a', 'PostQ10b', 'PostQ10c','PostQ10d', 'PostQ10e', 'PostQ11a', 'PostQ11b', 'PostQ11c',
        'PostQ11d', 'PostQ12a', 'PostQ12b', 'PostQ12c', 'PostQ12d','PostQ12e', 'PostQ12f', 'PostQ12g', 'PostQ12h']]
        
+#replacing missing value with a numpy missing value and defining categorie as 'categoty' type
+df = df.replace(' ',np.nan)
+#for column, series in df.iteritems():
+#    if not column in ['Name', 'Prison_ID', 'ID']:
+#        df[column] = df[column].astype('category')
+
+# making a new df for attitudinal scales
 columns_to_keep = ['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', 'Samples', 'PreQ4','PreQ1', 'PostQ1','Q12', 'Q13', 'Q14', 'Q15', 'Q16', 'Q17',
        'Q18', 'Q19', 'Q20', 'Q21', 'Q22', 'Q23', 'Q24', 'Q25', 'Q26','Q27', 'Q28', 'PostQ30']
 attitudinal_scales_df = pd.DataFrame(df,columns = columns_to_keep)
 
-first = re.compile('Strongly Agree',re.IGNORECASE)
-second = re.compile('Somewhat Agree',re.IGNORECASE)
-third = re.compile('Not Sure',re.IGNORECASE)
-fourth = re.compile('Somewhat Disagree',re.IGNORECASE)
-fifth = re.compile('Strongly Disagree',re.IGNORECASE)
+#coding for scales
+dummy_dict = {'first':('Strongly Agree',1), 'second': ('Somewhat Agree',2), 'third' : ('Not Sure',3), 'fourth': ('Somewhat Disagree',4), 'fifth' : ('Strongly Disagree',5)}
 
 for column in ['Q12', 'Q13', 'Q14', 'Q16','Q18', 'Q20', 'Q21', 'Q23','Q27', 'Q28', 'PostQ30']:
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(first,1)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(second,2)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(third,3)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(fourth,4)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(fifth,5)
+    for k,v in dummy_dict.iteritems():
+        #print k,v
+        k = re.compile(v[0], re.IGNORECASE)    
+        attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(k,v[1])
+    #print attitudinal_scales_df[column]
 
+#reverse coding for questions with opposite responses
+reverse_dummy_dict = dummy_dict = {'first':('Strongly Agree',5), 'second': ('Somewhat Agree',4), 'third' : ('Not Sure',3), 'fourth': ('Somewhat Disagree',2), 'fifth' : ('Strongly Disagree',1)}
 for column in ['Q15','Q17','Q19','Q22', 'Q24','Q25','Q26']:
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(first,5)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(second,4)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(third,3)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(fourth,2)
-    attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(fifth,1)
+    for k,v in reverse_dummy_dict.iteritems():
+        k = re.compile(v[0], re.IGNORECASE)    
+        attitudinal_scales_df[column] = attitudinal_scales_df[column].replace(k,v[1]) 
 
-df = df.replace(' ',np.nan)
-for column, series in df.iteritems():
-    if not column in ['Name', 'Prison_ID', 'ID']:
-        df[column] = df[column].astype('category')
-
+#cleaning data
 attitudinal_scales_df = attitudinal_scales_df.replace('33',3)
-attitudinal_scales_df = attitudinal_scales_df.replace(' ',np.nan)
-
-for column, series in df.iteritems():
-    if column in ['Prison','Gender', 'Group', 'Data_Round', 'Samples']:
-        df[column] = df[column].astype('category')
+#
+#for column, series in df.iteritems():
+#    if column in ['Prison','Gender', 'Group', 'Data_Round', 'Samples']:
+#        df[column] = df[column].astype('category')
 
 #creating a column for previous art experience
 attitudinal_scales_df['art_experience'] = attitudinal_scales_df['PostQ1']
@@ -81,6 +76,7 @@ for index, values in attitudinal_scales_df['PreQ1'].iteritems():
     elif values == "No, I haven't":
         attitudinal_scales_df.loc[index, 'art_experience'] ='No'    
 
+#computing the attributes from questions, for any question with missing value, attribute value is also missing. 
 for column,questions in [('Time Management',['Q12','Q17','Q22']),
                 ('Achievement Motivation',['Q13','Q18','Q16' ]),
                 ('Intellectual Flexibility',['Q14','Q19','Q24','Q26']),
@@ -90,54 +86,50 @@ for column,questions in [('Time Management',['Q12','Q17','Q22']),
     
     attitudinal_scales_df[column] = attitudinal_scales_df[questions].mean(axis=1,skipna=False)
     
+# Making pre and post evaluation dfs
 attributes =  ['Time Management', 'Achievement Motivation', 'Intellectual Flexibility' , 'Emotional Control','Self Confidence' ,'Social Competence']
 pre_df = attitudinal_scales_df.loc[attitudinal_scales_df['Group']=='Pre Program']
 post_df = attitudinal_scales_df.loc[attitudinal_scales_df['Group']=='Post-Program']
 
+#print attitudinal_scales_df[attributes]
+
+#removing the questions from pre and post dfs, only keeping data needed for calculation
 columns_atscales = ['Prison', 'Name', 'Prison_ID', 'ID', 'Gender', 'Group', 'Data_Round', 'Samples','art_experience','Time Management',
- 'Achievement Motivation', 'Intellectual Flexibility', 'Emotional Control',
- 'Self Confidence', 'Social Competence']
+                    'Achievement Motivation', 'Intellectual Flexibility', 'Emotional Control','Self Confidence', 'Social Competence']
 
 pre_df = pd.DataFrame(pre_df, columns = columns_atscales)
 post_df = pd.DataFrame(post_df, columns = columns_atscales)
 
 def hist():
+    '''histogram of all attributes
+    '''
     post = post_df[attributes].dropna()
     pre=  pre_df[attributes].dropna()
     pre[attributes].hist()
-    plt.suptitle("Pre-Program")
-    
+    plt.suptitle("Pre-Program")   
     post[attributes].hist()
     plt.suptitle("Post-Program")   
     plt.show()
 
-def qqplot():
-    return sm.qqplot(post_df['Time Management'],line = '45')
-    
 def test_normality():
-    #for column in attributes:
-    #     print column, sp.stats.shapiro(post_df[column])
+    '''
+    running shapiro wilk test for normality
+    ''' 
+    pre_nonull = pre_df[attributes].dropna()
+    post_nonull  = post_df[attributes].dropna()
     
-    post_table = [["Time Management", 0.7989435195922852, 1.7665534833566365e-12],
-                  ["Intellectual Flexibility", 0.8067236542701721, 3.310084845109529e-12],
-                  ["Achievement Motivation" ,0.5009009838104248, 1.0594767746240141e-19],
-                  ["Emotional Control", 0.8851432800292969, 6.317574907654944e-09],
-                  ["Self Confidence", 0.609407901763916, 1.4120606676629398e-17],
-                  ["Social Competence", 0.8981918692588806, 3.001261816848455e-08]]
+    pre_table = []
+    for column in attributes:
+        pre_W, pre_p = sp.stats.shapiro(pre_nonull[column])
+        pre_table.append([column, pre_W, pre_p])
+
+    post_table = []    
+    for column in attributes:
+         post_W, post_p = sp.stats.shapiro(post_nonull[column])
+         post_table.append([column, post_W, post_p])
+
+    pre = tabulate(pre_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')                                    
     post = tabulate(post_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')
-
-    #for column in attributes:
-    #    print column, sp.stats.shapiro(pre_df[column])
-    
-    pre_table = [["Time Management", 0.9098374843597412, 8.103528159608686e-08],
-                 ["Intellectual Flexibility", 0.9260804057121277, 8.383431122638285e-07],
-                 ["Achievement Motivation" ,0.7117029428482056, 1.8042233763319697e-15],
-                 ["Emotional Control", 0.9423717856407166, 1.190870170830749e-05,],
-                 ["Self Confidence", 0.7873598337173462, 3.5050795274028934e-13],
-                 ["Social Competence", 0.9072498083114624, 5.7175618906057935e-08]]
-
-    pre = tabulate(pre_table,headers = ["Attribute", "W stat", "p value"], floatfmt = ".2f", tablefmt = 'rst')
-
     return (post, pre)
 
 file1 = open("tables.txt",'w')
@@ -149,7 +141,6 @@ file1.write(test_normality()[0] + '\n' + 'W stat is significant for all attribut
 #Data is not normal, therefore running non parametric tests. 
 
 # Descriptive stats
-
 def descriptive_stats():
     pre = pre_df[attributes].describe() 
     post = post_df[attributes].describe()
@@ -192,18 +183,13 @@ file1.write(mannwhitney()[0] +'\n\n\n\n')
 file1.write('Mann Whitney U test - With Art Experience(Whole Sample)\n')
 file1.write(mannwhitney()[1] + '\n\n\n\n')
 
-
 def wilcoxon():
     ''' Signed Wilcoxon ranked test, only for paired samples
-    '''   
-    #pre = pre_df.loc[pre_df['Samples'] == 'Paired']
-    #post = post_df.loc[post_df['Samples'] == 'Paired']
-    
+    '''       
     pre = pre_df.loc[pre_df['Gender'] == 'Female']
     post = post_df.loc[post_df['Gender'] == 'Female']
     
     for column in attributes:        
-        #diff = np.subtract(post[column], pre[column])
         t,p = sp.stats.wilcoxon(pre[column], post[column])
         print column, t, round(p,4)
 
@@ -250,6 +236,7 @@ def stats_artexp():
     grouped_post.to_excel(writer, 'Sheet2')
     writer.save()
 
+#running parametric tests
 def ttest_ind(Gender = 'all'):
     pre_noart = pre_df.loc[pre_df['art_experience'] == 'No']
     pre_art = pre_df.loc[pre_df['art_experience'] == 'Yes']
@@ -280,8 +267,7 @@ file1.write(ttest_ind()[0] +'\n\n\n\n')
 file1.write('Independent Samples t-test - With Art Experience(Whole Sample)\n')
 file1.write(ttest_ind()[1] + '\n\n\n\n')
 
-#altered for females(for pairing)
-
+# t test altered for females(for pairing)
 def ttest_paired(Gender='Female'):
     pre_df = attitudinal_scales_df.loc[attitudinal_scales_df['Group']=='Pre Program']
     post_df = attitudinal_scales_df.loc[attitudinal_scales_df['Group']=='Post-Program']
@@ -314,8 +300,6 @@ file1.write('Paired Samples t-test - (Women Prison Data)\n')
 file1.write(ttest_ind()[0] +'\n\n\n\n')
 file1.close()
    
-
-
 def chisq():
     attitudinal_scales_df['Num'] = np.arange(323)
     renamed_df = attitudinal_scales_df.rename(columns = {'PreQ4': 'Pursuing Education' , 'art_experience' : 'Previous Art Experience'})
@@ -334,11 +318,8 @@ def chisq():
     chi2.to_excel(writer, 'Sheet2')
     writer.save()
 
-chisq()
-
 # making a dictionary with labels
 labels = {}
-
 with open('varnames.txt') as f:
     for line in f:
         ls = line.split()
@@ -346,7 +327,7 @@ with open('varnames.txt') as f:
         labels[ls[0]] = ' '.join(ls[1:])
 labels['art_experience'] = 'Previous Art Experience'
 
-
+#cleaning an incorrect value
 df['PreQ11c'] = df['PreQ11c'].replace('11','Yes')
 
 def pre_pivot():  
@@ -382,12 +363,10 @@ def pre_pivot():
         renamed.to_excel(writer, sheet_name='Sheet' + str(i))
     writer.save()
 
-pre_pivot()
 def barplots():                              
     prison_count= df['Prison'].value_counts()
     prison_count.plot(kind = 'bar',title = 'Count of Prisons', color = ['r','b','g'] ,fontsize = 12)
     g = sns.factorplot('Prison', data=df , palette = 'Pastel1', legend= True,margin_titles = True)
-    print g
 
 def att_barplots():
     pre_df[attributes].plot(kind = 'bar',title = 'Count of Prisons', color = ['r','b','g'] ,fontsize = 12)
